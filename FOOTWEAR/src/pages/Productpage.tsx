@@ -6,7 +6,7 @@ function ProductPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">👟 Product Details</h1>
+      <h1 className="text-2xl font-bold mb-4">🌙 Product Details</h1>
 
       {/* Show recommendations */}
       <Recommendations productId={productId} />

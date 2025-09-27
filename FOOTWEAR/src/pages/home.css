@@ -4,6 +4,7 @@
 /* General styles */
 .container {
   min-height: 100vh;
+  width: 100vw;
   background-color: #000;
   color: #fff;
   overflow: hidden;

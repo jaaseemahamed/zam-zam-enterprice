@@ -1,5 +1,7 @@
 // Navbar.tsx
 import React from "react";
+// 1. IMPORT Link from react-router-dom
+import { Link } from "react-router-dom";
 
 function Navbar() {
   const navStyle: React.CSSProperties = {
@@ -18,6 +20,12 @@ function Navbar() {
     gap: '32px'
   };
 
+  const linkStyle: React.CSSProperties = {
+    color: 'rgba(255, 255, 255, 0.8)',
+    textDecoration: 'none',
+    transition: 'color 0.3s'
+  };
+
   return (
     <nav style={navStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -34,9 +42,10 @@ function Navbar() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px', fontSize: '14px' }}>
-        <a href="/" style={{ color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'none' }}>Home</a>
-        <a href="/about" style={{ color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'none' }}>About</a>
-        <a href="/contact" style={{ color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'none' }}>Contact</a>
+        {/* 2. REPLACE <a> with <Link> and href with to */}
+        <Link to="/" style={linkStyle}>Home</Link>
+        <Link to="/about" style={linkStyle}>About</Link>
+        <Link to="/contact" style={linkStyle}>Contact</Link>
       </div>
     </nav>
   );

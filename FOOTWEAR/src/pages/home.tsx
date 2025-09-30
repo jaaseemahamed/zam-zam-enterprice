@@ -1,6 +1,8 @@
 //src/components/About.tsx 
 import { useState, useEffect } from 'react';
-
+import { Link } from 'react-router-dom';
+import shoe1 from '../assets/crocks.png';
+import shoe2 from '../assets/vkc.jpg';
 // Define types
 interface Product {
   id: number;
@@ -39,6 +41,9 @@ export default function HomePage() {
     color: '',
     quantity: 1
   });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cartItems, setCartItems] = useState<Array<Product & { quantity: number; selectedSize?: string; selectedColor?: string }>>([]);
+  const [showCart, setShowCart] = useState(false);
 
   // Telegram Bot Configuration - REPLACE THESE WITH YOUR ACTUAL VALUES
    const TELEGRAM_BOT_TOKEN = "8298136298:AAHfZQ715gzQ016w9kimtTp3rMfGOClOFOI"; 
@@ -74,7 +79,7 @@ export default function HomePage() {
       name: "Air Max Revolution", 
       price: 129.99, 
       originalPrice: 159.99, 
-      image: " https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&h=600&fit=crop&crop=center", 
+      image: shoe2, 
       category: "Sneakers", 
       rating: 4.8, 
       isNew: true,
@@ -86,7 +91,7 @@ export default function HomePage() {
       name: "Classic Leather Boot", 
       price: 189.99, 
       originalPrice: 229.99, 
-      image: "https://images.unsplash.com/photo-1608256246200-53e635b5b65f?w=600&h=600&fit=crop&crop=center", 
+      image: shoe1, 
       category: "Boots", 
       rating: 4.6, 
       isNew: false,
@@ -184,15 +189,15 @@ export default function HomePage() {
 📍 *Address:* ${orderForm.address}
 
 👟 *Product:* ${selectedProduct.name}
-💰 *Price:* $${selectedProduct.price}
+💰 *Price:* ₹${selectedProduct.price}
 📏 *Size:* US ${orderForm.size}
 🎨 *Color:* ${orderForm.color || 'Not specified'}
 📦 *Quantity:* ${orderForm.quantity}
-💵 *Total:* $${(selectedProduct.price * orderForm.quantity).toFixed(2)}
+💵 *Total:* ₹${(selectedProduct.price * orderForm.quantity).toFixed(2)}
 
 *Category:* ${selectedProduct.category}
 *Rating:* ${selectedProduct.rating}⭐
-    ` .trim();
+    `.trim();
 
     
     try {
@@ -218,6 +223,107 @@ export default function HomePage() {
       alert('Error submitting order. Please check your internet connection and try again.');
     }
   };
+
+  const addToCart = (product: Product) => {
+    const existingItem = cartItems.find(item => item.id === product.id);
+    if (existingItem) {
+      setCartItems(cartItems.map(item => 
+        item.id === product.id 
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      setCartItems([...cartItems, { ...product, quantity: 1 }]);
+    }
+    alert(`${product.name} added to cart!`);
+  };
+
+  const removeFromCart = (productId: number) => {
+    setCartItems(cartItems.filter(item => item.id !== productId));
+  };
+
+  const updateCartQuantity = (productId: number, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    setCartItems(cartItems.map(item =>
+      item.id === productId ? { ...item, quantity: newQuantity } : item
+    ));
+  };
+
+  const getTotalItems = () => {
+    return cartItems.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  const getTotalPrice = () => {
+    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+  };
+  const handleCheckout = async () => {
+  if (cartItems.length === 0) {
+    alert('Your cart is empty!');
+    return;
+  }
+
+  // Close cart modal
+  setShowCart(false);
+
+  // Create order message for all items
+  const itemsList = cartItems.map(item => 
+    `• ${item.name} (${item.category})\n  Qty: ${item.quantity} × ₹${item.price} = ₹${(item.price * item.quantity).toFixed(2)}`
+  ).join('\n\n');
+
+  const totalAmount = getTotalPrice().toFixed(2);
+
+  const checkoutMessage = `
+🛒 *New Cart Checkout - ZAM ZAM ENTERPRISES*
+
+📦 *Items Ordered:*
+${itemsList}
+
+💵 *Total Amount:* ₹${totalAmount}
+📊 *Total Items:* ${getTotalItems()}
+
+⚠️ *Note:* Customer details to be collected for delivery.
+  `.trim();
+
+  try {
+    const result = await sendToTelegram(checkoutMessage);
+    
+    if (result.ok) {
+      // Show success message and prompt for details
+      const customerName = prompt('Please enter your name:');
+      if (!customerName) return;
+
+      const customerPhone = prompt('Please enter your phone number:');
+      if (!customerPhone) return;
+
+      const customerAddress = prompt('Please enter your delivery address:');
+      if (!customerAddress) return;
+
+      // Send customer details
+      const detailsMessage = `
+👤 *Customer Details for Order Above:*
+
+Name: ${customerName}
+Phone: ${customerPhone}
+Address: ${customerAddress}
+      `.trim();
+
+      await sendToTelegram(detailsMessage);
+
+      alert('Order placed successfully! We will contact you soon.');
+      
+      // Clear cart
+      setCartItems([]);
+    } else {
+      throw new Error(`Telegram API Error: ${result.description || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error sending order:', error);
+    alert('Error submitting order. Please check your internet connection and try again.');
+  }
+};
 
 
   return (
@@ -300,6 +406,38 @@ export default function HomePage() {
           color: #fff;
         }
 
+        .cart-button {
+          position: relative;
+          background: transparent;
+          border: none;
+          color: #fff;
+          font-size: 20px;
+          cursor: pointer;
+          padding: 8px;
+          transition: all 0.3s;
+        }
+
+        .cart-button:hover {
+          transform: scale(1.1);
+        }
+
+        .cart-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: linear-gradient(135deg, #a855f7, #ec4899);
+          color: #fff;
+          border-radius: 50%;
+          font-size: 10px;
+          font-weight: bold;
+          min-width: 18px;
+          height: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2px;
+        }
+
         .mobile-menu {
           display: ${isMobile ? 'flex' : 'none'};
           width: 24px;
@@ -314,6 +452,62 @@ export default function HomePage() {
           height: 2px;
           background: #fff;
           border-radius: 1px;
+          transition: all 0.3s;
+        }
+
+        .mobile-menu.open .mobile-menu-bar:nth-child(1) {
+          transform: rotate(45deg) translateY(8px);
+        }
+
+        .mobile-menu.open .mobile-menu-bar:nth-child(2) {
+          opacity: 0;
+        }
+
+        .mobile-menu.open .mobile-menu-bar:nth-child(3) {
+          transform: rotate(-45deg) translateY(-8px);
+        }
+
+        .mobile-menu-dropdown {
+          position: fixed;
+          top: ${isMobile ? '80px' : '0'};
+          left: 0;
+          right: 0;
+          background: rgba(0, 0, 0, 0.95);
+          backdrop-filter: blur(24px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 24px;
+          padding: 24px;
+          display: ${mobileMenuOpen ? 'flex' : 'none'};
+          flex-direction: column;
+          gap: 16px;
+          z-index: 40;
+          margin: 0 16px;
+          animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .mobile-menu-link {
+          color: #fff;
+          text-decoration: none;
+          font-size: 18px;
+          padding: 12px;
+          border-radius: 12px;
+          transition: all 0.3s;
+          text-align: center;
+        }
+
+        .mobile-menu-link:hover {
+          background: rgba(168, 85, 247, 0.2);
         }
 
         .hero {
@@ -679,6 +873,29 @@ export default function HomePage() {
           padding: ${isMobile ? '6px' : '8px'};
           font-size: ${isMobile ? '14px' : '16px'};
         }
+           {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                    <button 
+                      className="add-to-cart-main-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(product);
+                      }}
+                    >
+                      <span>🛍</span>
+                      <span>Add to Cart</span>
+                    </button>
+                    <button 
+                      className="buy-now-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBuyNow(product);
+                      }}
+                    >
+                      <span>🛒</span>
+                      <span>Buy Now</span>
+                    </button>
+                  </div>
 
         .product-info {
           display: flex;
@@ -747,821 +964,1143 @@ export default function HomePage() {
         }
 
         .savings-badge {
-          background: rgba(34, 197, 94, 0.2);
+          background: rgba(34, 197, 94,0.2);
           color: #4ade80;
           border-radius: 4px;
           padding: 4px 8px;
           font-weight: 500;
           font-size: ${isMobile ? '12px' : '12px'};
-        }
+          }
+          .product-colors {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
 
-        .product-colors {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 16px;
-        }
+    .colors-label {
+      color: #9ca3af;
+      font-size: ${isMobile ? '12px' : '14px'};
+    }
 
-        .colors-label {
-          color: #9ca3af;
-          font-size: ${isMobile ? '12px' : '14px'};
-        }
+    .color-options {
+      display: flex;
+      gap: 4px;
+    }
 
-        .color-options {
-          display: flex;
-          gap: 4px;
-        }
+    .color-option {
+      width: ${isMobile ? '16px' : '20px'};
+      height: ${isMobile ? '16px' : '20px'};
+      border-radius: 50%;
+      border: 2px solid #4b5563;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
 
-        .color-option {
-          width: ${isMobile ? '16px' : '20px'};
-          height: ${isMobile ? '16px' : '20px'};
-          border-radius: 50%;
-          border: 2px solid #4b5563;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
+    .color-option:hover {
+      border-color: #fff;
+    }
 
-        .color-option:hover {
-          border-color: #fff;
-        }
+    .buy-now-btn {
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      color: #fff;
+      font-weight: 600;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.3s;
+      padding: ${isMobile ? '12px 16px' : '14px 20px'};
+      font-size: ${isMobile ? '14px' : '16px'};
+      width: 100%;
+    }
 
-        .buy-now-btn {
-          background: linear-gradient(135deg, #a855f7, #ec4899);
-          color: #fff;
-          font-weight: 600;
-          border-radius: 12px;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          transition: all 0.3s;
-          padding: ${isMobile ? '12px 16px' : '14px 20px'};
-          font-size: ${isMobile ? '14px' : '16px'};
-          width: 100%;
-        }
+    .buy-now-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3);
+    }
 
-        .buy-now-btn:hover {
-          transform: scale(1.02);
-          box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3);
-        }
+    .features-section {
+      background: linear-gradient(to right, rgba(88, 28, 135, 0.2), transparent, rgba(30, 58, 138, 0.2));
+      padding: ${isMobile ? '64px 16px' : isTablet ? '80px 24px' : '96px 16px'};
+      width: 100vw;
+    }
 
-        .features-section {
-          background: linear-gradient(to right, rgba(88, 28, 135, 0.2), transparent, rgba(30, 58, 138, 0.2));
-          padding: ${isMobile ? '64px 16px' : isTablet ? '80px 24px' : '96px 16px'};
-          width: 100vw;
-        }
+    .features-container {
+      max-width: 1024px;
+      margin: 0 auto;
+      text-align: center;
+    }
 
-        .features-container {
-          max-width: 1024px;
-          margin: 0 auto;
-          text-align: center;
-        }
+    .features-title {
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 32px;
+      font-size: ${isMobile ? '24px' : '32px'};
+    }
 
-        .features-title {
-          font-weight: bold;
-          color: #fff;
-          margin-bottom: 32px;
-          font-size: ${isMobile ? '24px' : '32px'};
-        }
+    .features-grid {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: ${isMobile ? '1fr' : isTablet ? '1fr' : 'repeat(3, 1fr)'};
+    }
 
-        .features-grid {
-          display: grid;
-          gap: 24px;
-          grid-template-columns: ${isMobile ? '1fr' : isTablet ? '1fr' : 'repeat(3, 1fr)'};
-        }
+    .feature-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
 
-        .feature-item {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 16px;
-        }
+    .feature-icon {
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: ${isMobile ? '48px' : '64px'};
+      height: ${isMobile ? '48px' : '64px'};
+      font-size: ${isMobile ? '24px' : '32px'};
+    }
 
-        .feature-icon {
-          background: linear-gradient(135deg, #a855f7, #ec4899);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: ${isMobile ? '48px' : '64px'};
-          height: ${isMobile ? '48px' : '64px'};
-          font-size: ${isMobile ? '24px' : '32px'};
-        }
+    .feature-icon.blue {
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    }
 
+    .feature-icon.green {
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
 
-        .feature-icon.blue {
-          background: linear-gradient(135deg, #3b82f6, #06b6d4);
-        }
+    .feature-title {
+      font-weight: 600;
+      color: #fff;
+      font-size: ${isMobile ? '18px' : '20px'};
+    }
 
-        .feature-icon.green {
-          background: linear-gradient(135deg, #10b981, #059669);
-        }
+    .feature-description {
+      color: #9ca3af;
+      text-align: center;
+      max-width: 320px;
+      font-size: ${isMobile ? '14px' : '16px'};
+      line-height: 1.6;
+    }
 
-        .feature-title {
-          font-weight: 600;
-          color: #fff;
-          font-size: ${isMobile ? '18px' : '20px'};
-        }
+    .footer {
+      background: #111827;
+      padding: ${isMobile ? '48px 16px 24px' : '64px 16px 32px'};
+      border-top: 1px solid rgba(75, 85, 99, 0.3);
+      width: 100%;
+      box-sizing: border-box;
+    }
 
-        .feature-description {
-          color: #9ca3af;
-          text-align: center;
-          max-width: 320px;
-          font-size: ${isMobile ? '14px' : '16px'};
-          line-height: 1.6;
-        }
+    .footer-container {
+      max-width: 1024px;
+      margin: 0 auto;
+      text-align: center;
+    }
 
-        .footer {
-  background: #111827;
-  padding: ${isMobile ? '48px 16px 24px' : '64px 16px 32px'};
-  border-top: 1px solid rgba(75, 85, 99, 0.3);
-  width: 100%;               /* ← CHANGED from 100vw */
-  box-sizing: border-box;    /* ← ADDED */
-}
+    .footer-logo {
+      font-size: ${isMobile ? '24px' : '28px'};
+      font-weight: bold;
+      margin-bottom: 16px;
+      background: linear-gradient(to right, #fff, #d1d5db);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+    }
 
-        .footer-container {
-          max-width: 1024px;
-          margin: 0 auto;
-          text-align: center;
-        }
+    .footer-tagline {
+      color: #9ca3af;
+      margin-bottom: 32px;
+      font-size: ${isMobile ? '14px' : '16px'};
+    }
 
-        .footer-logo {
-          font-size: ${isMobile ? '24px' : '28px'};
-          font-weight: bold;
-          margin-bottom: 16px;
-          background: linear-gradient(to right, #fff, #d1d5db);
-          background-clip: text;
-          -webkit-background-clip: text;
-          color: transparent;
-        }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: ${isMobile ? '16px' : '32px'};
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
 
-        .footer-tagline {
-          color: #9ca3af;
-          margin-bottom: 32px;
-          font-size: ${isMobile ? '14px' : '16px'};
-        }
+    .footer-link {
+      color: #d1d5db;
+      text-decoration: none;
+      font-size: ${isMobile ? '14px' : '16px'};
+      transition: color 0.3s;
+    }
 
-        .footer-links {
-          display: flex;
-          justify-content: center;
-          gap: ${isMobile ? '16px' : '32px'};
-          margin-bottom: 32px;
-          flex-wrap: wrap;
-        }
+    .footer-link:hover {
+      color: #a855f7;
+    }
 
-        .footer-link {
-          color: #d1d5db;
-          text-decoration: none;
-          font-size: ${isMobile ? '14px' : '16px'};
-          transition: color 0.3s;
-        }
+    .footer-divider {
+      height: 1px;
+      background: rgba(75, 85, 99, 0.3);
+      margin: 24px 0;
+    }
 
-        .footer-link:hover {
-          color: #a855f7;
-        }
+    .footer-bottom {
+      color: #6b7280;
+      font-size: ${isMobile ? '12px' : '14px'};
+    }
 
-        .footer-divider {
-          height: 1px;
-          background: rgba(75, 85, 99, 0.3);
-          margin: 24px 0;
-        }
+    .order-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
 
-        .footer-bottom {
-          color: #6b7280;
-          font-size: ${isMobile ? '12px' : '14px'};
-        }
+    .order-form {
+      background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(0, 0, 0, 0.95));
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(75, 85, 99, 0.3);
+      border-radius: 24px;
+      padding: ${isMobile ? '24px' : '32px'};
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
 
-        .order-modal {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.8);
-          backdrop-filter: blur(8px);
-          z-index: 100;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 16px;
-        }
+    .form-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
 
-        .order-form {
-          background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(0, 0, 0, 0.95));
-          backdrop-filter: blur(24px);
-          border: 1px solid rgba(75, 85, 99, 0.3);
-          border-radius: 24px;
-          padding: ${isMobile ? '24px' : '32px'};
-          width: 100%;
-          max-width: 500px;
-          max-height: 90vh;
-          overflow-y: auto;
-        }
+    .form-title {
+      font-size: ${isMobile ? '20px' : '24px'};
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 8px;
+    }
 
-        .form-header {
-          text-align: center;
-          margin-bottom: 24px;
-        }
+    .form-subtitle {
+      color: #9ca3af;
+      font-size: ${isMobile ? '14px' : '16px'};
+    }
 
-        .form-title {
-          font-size: ${isMobile ? '20px' : '24px'};
-          font-weight: bold;
-          color: #fff;
-          margin-bottom: 8px;
-        }
+    .form-group {
+      margin-bottom: 20px;
+    }
 
-        .form-subtitle {
-          color: #9ca3af;
-          font-size: ${isMobile ? '14px' : '16px'};
-        }
+    .form-label {
+      display: block;
+      color: #d1d5db;
+      font-weight: 500;
+      margin-bottom: 8px;
+      font-size: ${isMobile ? '14px' : '16px'};
+    }
 
-        .form-group {
-          margin-bottom: 20px;
-        }
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      background: rgba(55, 65, 81, 0.5);
+      border: 1px solid rgba(75, 85, 99, 0.5);
+      border-radius: 12px;
+      color: #fff;
+      font-size: ${isMobile ? '14px' : '16px'};
+      transition: all 0.3s;
+      padding: ${isMobile ? '12px 16px' : '14px 18px'};
+    }
 
-        .form-label {
-          display: block;
-          color: #d1d5db;
-          font-weight: 500;
-          margin-bottom: 8px;
-          font-size: ${isMobile ? '14px' : '16px'};
-        }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: #a855f7;
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+    }
 
-        .form-input, .form-select, .form-textarea {
-          width: 100%;
-          background: rgba(55, 65, 81, 0.5);
-          border: 1px solid rgba(75, 85, 99, 0.5);
-          border-radius: 12px;
-          color: #fff;
-          font-size: ${isMobile ? '14px' : '16px'};
-          transition: all 0.3s;
-          padding: ${isMobile ? '12px 16px' : '14px 18px'};
-        }
+    .form-input::placeholder {
+      color: #6b7280;
+    }
 
-        .form-input:focus, .form-select:focus, .form-textarea:focus {
-          outline: none;
-          border-color: #a855f7;
-          box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
-        }
+    .form-select option {
+      background: #1f2937;
+      color: #fff;
+    }
 
-        .form-input::placeholder {
-          color: #6b7280;
-        }
+    .form-textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
 
-        .form-select option {
-          background: #1f2937;
-          color: #fff;
-        }
+    .quantity-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(55, 65, 81, 0.5);
+      border-radius: 12px;
+      padding: 4px;
+      width: fit-content;
+    }
 
-        .form-textarea {
-          resize: vertical;
-          min-height: 100px;
-        }
+    .quantity-btn {
+      background: #a855f7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
 
-        .quantity-controls {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          background: rgba(55, 65, 81, 0.5);
-          border-radius: 12px;
-          padding: 4px;
-          width: fit-content;
-        }
+    .quantity-btn:hover {
+      background: #9333ea;
+    }
 
-        .quantity-btn {
-          background: #a855f7;
-          color: #fff;
-          border: none;
-          border-radius: 8px;
-          width: 36px;
-          height: 36px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-size: 18px;
-          font-weight: bold;
-          transition: all 0.3s;
-        }
+    .quantity-btn:disabled {
+      background: #6b7280;
+      cursor: not-allowed;
+    }
 
-        .quantity-btn:hover {
-          background: #9333ea;
-        }
+    .quantity-display {
+      color: #fff;
+      font-weight: 600;
+      min-width: 40px;
+      text-align: center;
+      font-size: 16px;
+    }
 
-        .quantity-btn:disabled {
-          background: #6b7280;
-          cursor: not-allowed;
-        }
+    .form-buttons {
+      display: flex;
+      gap: 16px;
+      margin-top: 32px;
+      flex-direction: ${isMobile ? 'column' : 'row'};
+    }
 
-        .quantity-display {
-          color: #fff;
-          font-weight: 600;
-          min-width: 40px;
-          text-align: center;
-          font-size: 16px;
-        }
+    .submit-btn {
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      color: #fff;
+      font-weight: 600;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.3s;
+      padding: ${isMobile ? '12px 16px' : '14px 20px'};
+      font-size: ${isMobile ? '14px' : '16px'};
+      flex: 1;
+    }
 
-        .form-buttons {
-          display: flex;
-          gap: 16px;
-          margin-top: 32px;
-          flex-direction: ${isMobile ? 'column' : 'row'};
-        }
+    .submit-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3);
+    }
 
-        .submit-btn {
-          background: linear-gradient(135deg, #a855f7, #ec4899);
-          color: #fff;
-          font-weight: 600;
-          border-radius: 12px;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          transition: all 0.3s;
-          padding: ${isMobile ? '12px 16px' : '14px 20px'};
-          font-size: ${isMobile ? '14px' : '16px'};
-          flex: 1;
-        }
+    .cancel-btn {
+      background: transparent;
+      color: #9ca3af;
+      font-weight: 600;
+      border-radius: 12px;
+      border: 1px solid rgba(75, 85, 99, 0.5);
+      cursor: pointer;
+      transition: all 0.3s;
+      padding: ${isMobile ? '12px 16px' : '14px 20px'};
+      font-size: ${isMobile ? '14px' : '16px'};
+      flex: 1;
+    }
 
-        .submit-btn:hover {
-          transform: scale(1.02);
-          box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3);
-        }
+    .cancel-btn:hover {
+      background: rgba(55, 65, 81, 0.5);
+      color: #fff;
+    }
 
-        .cancel-btn {
-          background: transparent;
-          color: #9ca3af;
-          font-weight: 600;
-          border-radius: 12px;
-          border: 1px solid rgba(75, 85, 99, 0.5);
-          cursor: pointer;
-          transition: all 0.3s;
-          padding: ${isMobile ? '12px 16px' : '14px 20px'};
-          font-size: ${isMobile ? '14px' : '16px'};
-          flex: 1;
-        }
+    .product-summary {
+      background: rgba(55, 65, 81, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
 
-        .cancel-btn:hover {
-          background: rgba(55, 65, 81, 0.5);
-          color: #fff;
-        }
+    .summary-product {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
 
-        .product-summary {
-          background: rgba(55, 65, 81, 0.3);
-          border-radius: 16px;
-          padding: 20px;
-          margin-bottom: 24px;
-        }
+    .summary-image {
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      object-fit: cover;
+    }
 
-        .summary-product {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          margin-bottom: 16px;
-        }
+    .summary-info h4 {
+      color: #fff;
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
 
-        .summary-image {
-          width: 60px;
-          height: 60px;
-          border-radius: 12px;
-          object-fit: cover;
-        }
+    .summary-info p {
+      color: #9ca3af;
+      font-size: 14px;
+      margin: 0;
+    }
 
-        .summary-info h4 {
-          color: #fff;
-          font-weight: 600;
-          font-size: 16px;
-          margin-bottom: 4px;
-        }
+    .summary-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 16px;
+      border-top: 1px solid rgba(75, 85, 99, 0.3);
+    }
 
-        .summary-info p {
-          color: #9ca3af;
-          font-size: 14px;
-          margin: 0;
-        }
+    .total-label {
+      color: #d1d5db;
+      font-weight: 500;
+    }
 
-        .summary-total {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding-top: 16px;
-          border-top: 1px solid rgba(75, 85, 99, 0.3);
-        }
+    .total-amount {
+      color: #fff;
+      font-weight: bold;
+      font-size: 20px;
+    }
 
-        .total-label {
-          color: #d1d5db;
-          font-weight: 500;
-        }
+    .cart-modal {
+      position: fixed;
+      top: 0;
+      right: ${showCart ? '0' : '-100%'};
+      width: ${isMobile ? '100%' : '400px'};
+      height: 100vh;
+      background: linear-gradient(135deg, rgba(17, 24, 39, 0.98), rgba(0, 0, 0, 0.98));
+      backdrop-filter: blur(24px);
+      border-left: 1px solid rgba(75, 85, 99, 0.3);
+      z-index: 100;
+      transition: right 0.3s ease-out;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
-        .total-amount {
-          color: #fff;
-          font-weight: bold;
-          font-size: 20px;
-        }
-      `}</style>
+    .cart-header {
+      padding: 24px;
+      border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
-      {/* Navigation */}
-      <nav className="nav">
-        <div className="nav-logo">
-          <span className="nav-logo-icon">👟</span>
-          <span className="nav-logo-text">ZAM ZAM ENTERPRISES</span>
+    .cart-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .close-cart-btn {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      font-size: 28px;
+      cursor: pointer;
+      transition: color 0.3s;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .close-cart-btn:hover {
+      color: #fff;
+    }
+
+    .cart-items {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .empty-cart {
+      text-align: center;
+      color: #9ca3af;
+      padding: 48px 24px;
+    }
+
+    .empty-cart-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .cart-item {
+      display: flex;
+      gap: 16px;
+      background: rgba(55, 65, 81, 0.3);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .cart-item-image {
+      width: 80px;
+      height: 80px;
+      border-radius: 12px;
+      object-fit: cover;
+    }
+
+    .cart-item-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cart-item-name {
+      color: #fff;
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .cart-item-price {
+      color: #a855f7;
+      font-weight: bold;
+      font-size: 18px;
+    }
+
+    .cart-item-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cart-quantity-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(55, 65, 81, 0.5);
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .cart-qty-btn {
+      background: #a855f7;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+
+    .cart-qty-btn:hover {
+      background: #9333ea;
+    }
+
+    .cart-qty-display {
+      color: #fff;
+      font-weight: 600;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .remove-item-btn {
+      background: transparent;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 20px;
+      transition: all 0.3s;
+      padding: 4px;
+    }
+
+    .remove-item-btn:hover {
+      color: #dc2626;
+      transform: scale(1.1);
+    }
+
+    .cart-footer {
+      padding: 24px;
+      border-top: 1px solid rgba(75, 85, 99, 0.3);
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    .cart-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      font-size: 20px;
+    }
+
+    .cart-total-label {
+      color: #d1d5db;
+      font-weight: 600;
+    }
+
+    .cart-total-amount {
+      color: #fff;
+      font-weight: bold;
+      font-size: 24px;
+    }
+
+    .checkout-btn {
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      color: #fff;
+      font-weight: 600;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      padding: 16px;
+      font-size: 16px;
+      width: 100%;
+      transition: all 0.3s;
+    }
+
+    .checkout-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3);
+    }
+
+    .checkout-btn:disabled {
+      background: #6b7280;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .cart-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 99;
+      display: ${showCart ? 'block' : 'none'};
+    }
+  `}</style>
+
+  <nav className="nav">
+    <div className="nav-logo">
+      <span className="nav-logo-icon">👟</span>
+      <span className="nav-logo-text">ZAM ZAM ENTERPRISES</span>
+    </div>
+    
+    {!isMobile ? (
+      <>
+        <div className="nav-links">
+          <Link to="/" className="nav-link">Home</Link>
+          <a href="#" className="nav-link">Collections</a>
+          <Link to="/about" className="nav-link">About</Link>
+          <Link to="/contact" className="nav-link">Contact</Link>
+        </div>
+        <button className="cart-button" onClick={() => setShowCart(true)}>
+          🛍️
+          {getTotalItems() > 0 && (
+            <span className="cart-badge">{getTotalItems()}</span>
+          )}
+        </button>
+      </>
+    ) : (
+      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <button className="cart-button" onClick={() => setShowCart(true)}>
+          🛍️
+          {getTotalItems() > 0 && (
+            <span className="cart-badge">{getTotalItems()}</span>
+          )}
+        </button>
+        <div 
+          className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          <span className="mobile-menu-bar"></span>
+          <span className="mobile-menu-bar"></span>
+          <span className="mobile-menu-bar"></span>
+        </div>
+      </div>
+    )}
+  </nav>
+
+  {/* Mobile Menu Dropdown */}
+  {isMobile && (
+    <div className="mobile-menu-dropdown">
+      <Link to="/" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>Home</Link>
+      <a href="#" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>Collections</a>
+      <Link to="/about" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>About</Link>
+      <Link to="/contact" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
+    </div>
+  )}
+
+  {/* Hero Section */}
+  <section className="hero">
+    <div className="hero-bg" />
+    
+    {/* Animated Background Elements */}
+    <div className="hero-bg-elements">
+      <div className="bg-element-1" />
+      <div className="bg-element-2" />
+    </div>
+    
+    <div className="hero-content">
+      <div className="hero-badge">
+        <span>✨</span>
+        <span>{heroSlides[currentSlide].subtitle}</span>
+      </div>
+      
+      <h1 className="hero-title">
+        {heroSlides[currentSlide].title}
+      </h1>
+      
+      <p className="hero-description">
+        {heroSlides[currentSlide].description}
+      </p>
+      
+      <div className="hero-buttons">
+        <button className="btn-primary">
+          <span>Explore Collection</span>
+          <span>→</span>
+        </button>
+      </div>
+    </div>
+
+    {!isMobile && (
+      <div className="scroll-indicator">
+        <div className="scroll-line" />
+        <p className="scroll-text">SCROLL</p>
+      </div>
+    )}
+  </section>
+
+  {/* Featured Products */}
+  <section className="featured-section">
+    <div className="featured-container">
+      <div className="featured-header">
+        <div className="featured-badge">
+          <span className="featured-badge-icon">⭐</span>
+          <span className="featured-badge-text">Featured Collection</span>
         </div>
         
-        {!isMobile ? (
-          <div className="nav-links">
-            <a href="#" className="nav-link">Collections</a>
-            <a href="#" className="nav-link">About</a>
-            <a href="#" className="nav-link">Contact</a>
-          </div>
-        ) : (
-          <div className="mobile-menu">
-            <span className="mobile-menu-bar"></span>
-            <span className="mobile-menu-bar"></span>
-            <span className="mobile-menu-bar"></span>
-          </div>
-        )}
-      </nav>
+        <h2 className="featured-title">
+          Signature Pieces
+        </h2>
+        
+        <p className="featured-description">
+          Meticulously crafted footwear that embodies luxury, comfort, and timeless style
+        </p>
+      </div>
 
-      {/* Hero Section */}
-      <section className="hero">
-        <div className="hero-bg" />
-        
-        {/* Animated Background Elements */}
-        <div className="hero-bg-elements">
-          <div className="bg-element-1" />
-          <div className="bg-element-2" />
-        </div>
-        
-        <div className="hero-content">
-          <div className="hero-badge">
-            <span>✨</span>
-            <span>{heroSlides[currentSlide].subtitle}</span>
-          </div>
-          
-          <h1 className="hero-title">
-            {heroSlides[currentSlide].title}
-          </h1>
-          
-          <p className="hero-description">
-            {heroSlides[currentSlide].description}
-          </p>
-          
-          <div className="hero-buttons">
-            <button className="btn-primary">
-              <span>Explore Collection</span>
-              <span>→</span>
+      <div className="products-grid">
+        {featuredProducts.map((product) => (
+          <div
+            key={product.id}
+            className="product-card"
+            onMouseEnter={() => !isMobile && setHoveredProduct(product.id)}
+            onMouseLeave={() => !isMobile && setHoveredProduct(null)}
+            onClick={() => isMobile && setHoveredProduct(hoveredProduct === product.id ? null : product.id)}
+          >
+            {/* Product Badge */}
+            {product.isNew && (
+              <div className="product-badge">
+                <span>🔥</span>
+                <span>New</span>
+              </div>
+            )}
+
+            {/* Wishlist Button */}
+            <button className="wishlist-btn">
+              ♡
             </button>
-            <button className="btn-secondary">
-              Watch Story
-            </button>
-          </div>
-        </div>
 
-        {!isMobile && (
-          <div className="scroll-indicator">
-            <div className="scroll-line" />
-            <p className="scroll-text">SCROLL</p>
-          </div>
-        )}
-      </section>
-
-      {/* Featured Products */}
-      <section className="featured-section">
-        <div className="featured-container">
-          <div className="featured-header">
-            <div className="featured-badge">
-              <span className="featured-badge-icon">⭐</span>
-              <span className="featured-badge-text">Featured Collection</span>
-            </div>
-            
-            <h2 className="featured-title">
-              Signature Pieces
-            </h2>
-            
-            <p className="featured-description">
-              Meticulously crafted footwear that embodies luxury, comfort, and timeless style
-            </p>
-          </div>
-
-          <div className="products-grid">
-            {featuredProducts.map((product) => (
-              <div
-                key={product.id}
-                className="product-card"
-                onMouseEnter={() => !isMobile && setHoveredProduct(product.id)}
-                onMouseLeave={() => !isMobile && setHoveredProduct(null)}
-                onClick={() => isMobile && setHoveredProduct(hoveredProduct === product.id ? null : product.id)}
-              >
-                {/* Product Badge */}
-                {product.isNew && (
-                  <div className="product-badge">
-                    <span>🔥</span>
-                    <span>New</span>
-                  </div>
-                )}
-
-                {/* Wishlist Button */}
-                <button className="wishlist-btn">
-                  ♡
+            {/* Product Image */}
+            <div className="product-image-container">
+              <img 
+                src={product.image} 
+                alt={product.name}
+                className="product-image"
+              />
+              <div className="product-overlay" />
+              
+              {/* Quick Actions */}
+              <div className="quick-actions">
+                <button className="quick-view-btn">
+                  <span>👁</span>
+                  <span>Quick View</span>
                 </button>
+                <button 
+                  className="add-to-cart-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addToCart(product);
+                  }}
+                >
+                  🛍
+                </button>
+              </div>
+            </div>
 
-                {/* Product Image */}
-                <div className="product-image-container">
-                  <img 
-                    src={product.image} 
-                    alt={product.name}
-                    className="product-image"
-                  />
-                  <div className="product-overlay" />
-                  
-                  {/* Quick Actions */}
-                  <div className="quick-actions">
-                    <button className="quick-view-btn">
-                      <span>👁</span>
-                      <span>Quick View</span>
-                    </button>
-                    <button className="add-to-cart-btn">
-                      🛍
-                    </button>
-                  </div>
-                </div>
-
-                {/* Product Info */}
-                <div className="product-info">
-                  <div className="product-meta">
-                    <span className="product-category">
-                      {product.category}
-                    </span>
-                    <div className="product-rating">
-                      <span className="rating-star">⭐</span>
-                      <span className="rating-score">
-                        {product.rating}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <h3 className="product-name">
-                    {product.name}
-                  </h3>
-                  
-                  <div className="product-pricing">
-                    <span className="current-price">
-                      ${product.price}
-                    </span>
-                    <span className="original-price">
-                      ${product.originalPrice}
-                    </span>
-                    <span className="savings-badge">
-                      Save ${(product.originalPrice - product.price).toFixed(0)}
-                    </span>
-                  </div>
-
-                  {/* Color Options */}
-                  <div className="product-colors">
-                    <span className="colors-label">Colors:</span>
-                    <div className="color-options">
-                      {product.colors.map((color, i) => (
-                        <div 
-                          key={i} 
-                          className="color-option"
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Buy Now Button */}
-                  <button 
-                    className="buy-now-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBuyNow(product);
-                    }}
-                  >
-                    <span>🛒</span>
-                    <span>Buy Now</span>
-                  </button>
+            {/* Product Info */}
+            <div className="product-info">
+              <div className="product-meta">
+                <span className="product-category">
+                  {product.category}
+                </span>
+                <div className="product-rating">
+                  <span className="rating-star">⭐</span>
+                  <span className="rating-score">
+                    {product.rating}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="features-section">
-        <div className="features-container">
-          <h3 className="features-title">
-            Why Choose ZAM ZAM ENTERPRISES
-          </h3>
-          
-          <div className="features-grid">
-            <div className="feature-item">
-              <div className="feature-icon">
-                🚀
-              </div>
-              <h4 className="feature-title">
-                Fast Delivery
-              </h4>
-              <p className="feature-description">
-                Get your premium footwear delivered within 24-48 hours with our express shipping service.
-              </p>
-            </div>
-            
-            <div className="feature-item">
-              <div className="feature-icon blue">
-                🛡️
-              </div>
-              <h4 className="feature-title">
-                Quality Guarantee
-              </h4>
-              <p className="feature-description">
-                All our products come with a 30-day quality guarantee and hassle-free returns.
-              </p>
-            </div>
-            
-            <div className="feature-item">
-              <div className="feature-icon green">
-                💎
-              </div>
-              <h4 className="feature-title">
-                Premium Materials
-              </h4>
-              <p className="feature-description">
-                Crafted using only the finest materials for durability, comfort, and style.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="footer">
-        <div className="footer-container">
-          <div className="footer-logo">ZAM ZAM ENTERPRISES</div>
-          <p className="footer-tagline">
-            Your trusted partner in premium footwear since 2020
-          </p>
-          <div className="footer-links">
-            <a href="#privacy" className="footer-link">Privacy Policy</a>
-            <a href="#terms" className="footer-link">Terms of Service</a>
-            <a href="#shipping" className="footer-link">Shipping Info</a>
-            <a href="#support" className="footer-link">Customer Support</a>
-          </div>
-          <div className="footer-divider"></div>
-          <p className="footer-bottom">
-            © 2024 ZAM ZAM Enterprises. All rights reserved.
-          </p>
-        </div>
-      </footer>
-
-      {/* Order Form Modal */}
-      {showOrderForm && selectedProduct && (
-        <div className="order-modal">
-          <form className="order-form" onSubmit={handleOrderSubmit}>
-            <div className="form-header">
-              <h3 className="form-title">Complete Your Order</h3>
-              <p className="form-subtitle">Just a few details to get your luxury footwear delivered</p>
-            </div>
-
-            {/* Product Summary */}
-            <div className="product-summary">
-              <div className="summary-product">
-                <img 
-                  src={selectedProduct.image} 
-                  alt={selectedProduct.name}
-                  className="summary-image"
-                />
-                <div className="summary-info">
-                  <h4>{selectedProduct.name}</h4>
-                  <p>{selectedProduct.category} • ⭐ {selectedProduct.rating}</p>
-                </div>
-              </div>
-              <div className="summary-total">
-                <span className="total-label">Total:</span>
-                <span className="total-amount">
-                  ${(selectedProduct.price * orderForm.quantity).toFixed(2)}
+              
+              <h3 className="product-name">
+                {product.name}
+              </h3>
+              
+              <div className="product-pricing">
+                <span className="current-price">
+                  ₹{product.price}
+                </span>
+                <span className="original-price">
+                  ₹{product.originalPrice}
+                </span>
+                <span className="savings-badge">
+                  Save ₹{(product.originalPrice - product.price).toFixed(0)}
                 </span>
               </div>
-            </div>
 
-            <div className="form-group">
-              <label className="form-label">Full Name *</label>
-              <input
-                type="text"
-                className="form-input"
-                value={orderForm.name}
-                onChange={(e) => setOrderForm({...orderForm, name: e.target.value})}
-                required
-                placeholder="Enter your full name"
-              />
-            </div>
+              {/* Color Options */}
+              <div className="product-colors">
+                <span className="colors-label">Colors:</span>
+                <div className="color-options">
+                  {product.colors.map((color, i) => (
+                    <div 
+                      key={i} 
+                      className="color-option"
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
 
-            <div className="form-group">
-              <label className="form-label">Phone Number *</label>
-              <input
-                type="tel"
-                className="form-input"
-                value={orderForm.phone}
-                onChange={(e) => setOrderForm({...orderForm, phone: e.target.value})}
-                required
-                placeholder="+1 (555) 123-4567"
-              />
+              {/* Buy Now Button */}
+             {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                    
+                    <button 
+                      className="buy-now-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBuyNow(product);
+                      }}
+                    >
+                      <span>🛒</span>
+                      <span>Buy Now</span>
+                    </button>
+                  </div>
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
 
-            <div className="form-group">
-              <label className="form-label">Delivery Address *</label>
-              <textarea
-                className="form-textarea"
-                value={orderForm.address}
-                onChange={(e) => setOrderForm({...orderForm, address: e.target.value})}
-                required
-                placeholder="Enter your complete delivery address..."
-              />
+  {/* Features Section */}
+  <section className="features-section">
+    <div className="features-container">
+      <h3 className="features-title">
+        Why Choose ZAM ZAM ENTERPRISES
+      </h3>
+      
+      <div className="features-grid">
+        <div className="feature-item">
+          <div className="feature-icon">
+            🚀
+          </div>
+          <h4 className="feature-title">
+            Fast Delivery
+          </h4>
+          <p className="feature-description">
+            Get your premium footwear delivered within 24-48 hours with our express shipping service.
+          </p>
+        </div>
+        
+        <div className="feature-item">
+          <div className="feature-icon blue">
+            🛡️
+          </div>
+          <h4 className="feature-title">
+            Quality Guarantee
+          </h4>
+          <p className="feature-description">
+            All our products come with a 30-day quality guarantee and hassle-free returns.
+          </p>
+        </div>
+        
+        <div className="feature-item">
+          <div className="feature-icon green">
+            💎
+          </div>
+          <h4 className="feature-title">
+            Premium Materials
+          </h4>
+          <p className="feature-description">
+            Crafted using only the finest materials for durability, comfort, and style.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* Footer */}
+  <footer className="footer">
+    <div className="footer-container">
+      <div className="footer-logo">ZAM ZAM ENTERPRISES</div>
+      <p className="footer-tagline">
+        Your trusted partner in premium footwear since 2020
+      </p>
+      <div className="footer-links">
+        <a href="#privacy" className="footer-link">Privacy Policy</a>
+        <a href="#terms" className="footer-link">Terms of Service</a>
+        <a href="#shipping" className="footer-link">Shipping Info</a>
+        <a href="#support" className="footer-link">Customer Support</a>
+      </div>
+      <div className="footer-divider"></div>
+      <p className="footer-bottom">
+        © 2024 ZAM ZAM Enterprises. All rights reserved.
+      </p>
+    </div>
+  </footer>
+
+  {/* Order Form Modal */}
+  {showOrderForm && selectedProduct && (
+    <div className="order-modal">
+      <form className="order-form" onSubmit={handleOrderSubmit}>
+        <div className="form-header">
+          <h3 className="form-title">Complete Your Order</h3>
+          <p className="form-subtitle">Just a few details to get your luxury footwear delivered</p>
+        </div>
+
+        {/* Product Summary */}
+        <div className="product-summary">
+          <div className="summary-product">
+            <img 
+              src={selectedProduct.image} 
+              alt={selectedProduct.name}
+              className="summary-image"
+            />
+            <div className="summary-info">
+              <h4>{selectedProduct.name}</h4>
+              <p>{selectedProduct.category} • ⭐ {selectedProduct.rating}</p>
             </div>
+          </div>
+          <div className="summary-total">
+            <span className="total-label">Total:</span>
+            <span className="total-amount">
+              ₹{(selectedProduct.price * orderForm.quantity).toFixed(2)}
+            </span>
+          </div>
+        </div>
 
-            <div className="form-group">
-              <label className="form-label">Size *</label>
-              <select
-                className="form-select"
-                value={orderForm.size}
-                onChange={(e) => setOrderForm({...orderForm, size: e.target.value})}
-                required
-              >
-                <option value="">Select Size</option>
-                {selectedProduct.sizes.map((size: string) => (
-                  <option key={size} value={size}>US {size}</option>
-                ))}
-              </select>
+        <div className="form-group">
+          <label className="form-label">Full Name *</label>
+          <input
+            type="text"
+            className="form-input"
+            value={orderForm.name}
+            onChange={(e) => setOrderForm({...orderForm, name: e.target.value})}
+            required
+            placeholder="Enter your full name"
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Phone Number *</label>
+          <input
+            type="tel"
+            className="form-input"
+            value={orderForm.phone}
+            onChange={(e) => setOrderForm({...orderForm, phone: e.target.value})}
+            required
+            placeholder="+1 (555) 123-4567"
+            />
             </div>
-
             <div className="form-group">
-              <label className="form-label">Preferred Color</label>
-              <select
-                className="form-select"
-                value={orderForm.color}
-                onChange={(e) => setOrderForm({...orderForm, color: e.target.value})}
-              >
-                <option value="">Select Color</option>
-                {selectedProduct.colors.map((color, index) => (
-                  <option key={index} value={color}>
-                    {color === '#000' ? 'Black' : 
-                     color === '#fff' ? 'White' : 
-                     color === '#ff6b6b' ? 'Red' :
-                     color === '#8B4513' ? 'Brown' :
-                     color === '#D2691E' ? 'Light Brown' :
-                     color === '#4ECDC4' ? 'Turquoise' :
-                     color === '#45B7D1' ? 'Blue' :
-                     color === '#96CEB4' ? 'Mint' :
-                     color === '#2C3E50' ? 'Dark Blue' :
-                     'Custom Color'}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <label className="form-label">Delivery Address *</label>
+          <textarea
+            className="form-textarea"
+            value={orderForm.address}
+            onChange={(e) => setOrderForm({...orderForm, address: e.target.value})}
+            required
+            placeholder="Enter your complete delivery address..."
+          />
+        </div>
 
-            <div className="form-group">
-              <label className="form-label">Quantity</label>
-              <div className="quantity-controls">
+        <div className="form-group">
+          <label className="form-label">Size *</label>
+          <select
+            className="form-select"
+            value={orderForm.size}
+            onChange={(e) => setOrderForm({...orderForm, size: e.target.value})}
+            required
+          >
+            <option value="">Select Size</option>
+            {selectedProduct.sizes.map((size: string) => (
+              <option key={size} value={size}>US {size}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Preferred Color</label>
+          <select
+            className="form-select"
+            value={orderForm.color}
+            onChange={(e) => setOrderForm({...orderForm, color: e.target.value})}
+          >
+            <option value="">Select Color</option>
+            {selectedProduct.colors.map((color, index) => (
+              <option key={index} value={color}>
+                {color === '#000' ? 'Black' : 
+                 color === '#fff' ? 'White' : 
+                 color === '#ff6b6b' ? 'Red' :
+                 color === '#8B4513' ? 'Brown' :
+                 color === '#D2691E' ? 'Light Brown' :
+                 color === '#4ECDC4' ? 'Turquoise' :
+                 color === '#45B7D1' ? 'Blue' :
+                 color === '#96CEB4' ? 'Mint' :
+                 color === '#2C3E50' ? 'Dark Blue' :
+                 'Custom Color'}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Quantity</label>
+          <div className="quantity-controls">
+            <button
+              type="button"
+              className="quantity-btn"
+              onClick={() => setOrderForm({...orderForm, quantity: Math.max(1, orderForm.quantity - 1)})}
+              disabled={orderForm.quantity <= 1}
+            >
+              −
+            </button>
+            <span className="quantity-display">{orderForm.quantity}</span>
+            <button
+              type="button"
+              className="quantity-btn"
+              onClick={() => setOrderForm({...orderForm, quantity: orderForm.quantity + 1})}
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div className="form-buttons">
+          <button type="submit" className="submit-btn">
+            <span>📦</span>
+            <span>Place Order</span>
+          </button>
+          <button 
+            type="button" 
+            className="cancel-btn"
+            onClick={() => setShowOrderForm(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  )}
+
+  {/* Shopping Cart Modal */}
+  <div className="cart-backdrop" onClick={() => setShowCart(false)} />
+  <div className="cart-modal">
+    <div className="cart-header">
+      <h3 className="cart-title">Your Cart ({getTotalItems()})</h3>
+      <button className="close-cart-btn" onClick={() => setShowCart(false)}>×</button>
+    </div>
+
+    <div className="cart-items">
+      {cartItems.length === 0 ? (
+        <div className="empty-cart">
+          <div className="empty-cart-icon">🛍️</div>
+          <p>Your cart is empty</p>
+          <p style={{ fontSize: '14px', marginTop: '8px' }}>Add some products to get started!</p>
+        </div>
+      ) : (
+        cartItems.map((item) => (
+          <div key={item.id} className="cart-item">
+            <img src={item.image} alt={item.name} className="cart-item-image" />
+            <div className="cart-item-info">
+              <h4 className="cart-item-name">{item.name}</h4>
+              <p className="cart-item-price">₹{item.price}</p>
+              <div className="cart-item-controls">
+                <div className="cart-quantity-controls">
+                  <button
+                    className="cart-qty-btn"
+                    onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                  >
+                    −
+                  </button>
+                  <span className="cart-qty-display">{item.quantity}</span>
+                  <button
+                    className="cart-qty-btn"
+                    onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                  >
+                    +
+                  </button>
+                </div>
                 <button
-                  type="button"
-                  className="quantity-btn"
-                  onClick={() => setOrderForm({...orderForm, quantity: Math.max(1, orderForm.quantity - 1)})}
-                  disabled={orderForm.quantity <= 1}
+                  className="remove-item-btn"
+                  onClick={() => removeFromCart(item.id)}
+                  title="Remove item"
                 >
-                  −
-                </button>
-                <span className="quantity-display">{orderForm.quantity}</span>
-                <button
-                  type="button"
-                  className="quantity-btn"
-                  onClick={() => setOrderForm({...orderForm, quantity: orderForm.quantity + 1})}
-                >
-                  +
+                  🗑️
                 </button>
               </div>
             </div>
-
-            <div className="form-buttons">
-              <button type="submit" className="submit-btn">
-                <span>📦</span>
-                <span>Place Order</span>
-              </button>
-              <button 
-                type="button" 
-                className="cancel-btn"
-                onClick={() => setShowOrderForm(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        ))
       )}
     </div>
-  );
+
+    {cartItems.length > 0 && (
+      <div className="cart-footer">
+        <div className="cart-total">
+          <span className="cart-total-label">Total:</span>
+          <span className="cart-total-amount">₹{getTotalPrice().toFixed(2)}</span>
+        </div>
+       <button 
+        className="checkout-btn"
+        onClick={handleCheckout}
+        disabled={cartItems.length === 0}
+      >
+        Proceed to Checkout
+      </button>
+      </div>
+    )}
+  </div>
+</div>
+);
 }
